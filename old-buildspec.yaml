@@ -1,0 +1,45 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "Installing AWS CLI..."
+      - pip install --upgrade awscliv2
+
+  build:
+    commands:
+      - aws --version
+      - echo "Creating/updating CloudFormation stack..."
+      - STACK_NAME="foldercreation"
+      - TEMPLATE_FILE="config/oldercreation_dev.yaml"
+      - REGION="us-east-2"
+      - FUNCTION_NAME="BucketFolderCreation"
+      - set +e
+      - |
+        stack_status=$(aws cloudformation describe-stacks --region $REGION --stack-name $STACK_NAME --query Stacks[0].StackStatus | tr -d '"')
+        set -e
+      - if [ $stack_status = "CREATE_COMPLETE" ]; then
+          echo "Stack Already Exists. Invoking lambda function"
+          aws lambda invoke --function-name $FUNCTION_NAME --region $REGION response.json
+        elif [ $stack_status = "ROLLBACK_FAILED" ] || [ $stack_status = "ROLLBACK_COMPLETE" ] || [ $stack_status = "DELETE_IN_PROGRESS" ] || [ $stack_status = "DELETE_FAILED" ] || [ $stack_status = "CREATE_FAILED" ] || [ $stack_status = "CREATE_IN_PROGRESS" ]; then
+          echo "Stack is Broken. Deleting Broken Stack"
+          aws cloudformation delete-stack --stack-name $STACK_NAME --region $REGION
+          sleep 20
+          echo "Now Creating stack $STACK_NAME..."
+          aws cloudformation create-stack \
+            --region "$REGION" \
+            --stack-name "$STACK_NAME" \
+            --template-body "file://$TEMPLATE_FILE" \
+            --capabilities CAPABILITY_NAMED_IAM
+        else
+          aws cloudformation create-stack \
+            --region "$REGION" \
+            --stack-name "$STACK_NAME" \
+            --template-body "file://$TEMPLATE_FILE" \
+            --capabilities CAPABILITY_NAMED_IAM
+        fi

@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template for Lambda functions and API Gateway
+
+Parameters:
+  LambdaBucketName:
+    Type: String
+    Description: The name of the S3 bucket containing lambda code
+
+Resources:
+  BucketLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-BucketLambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${LambdaBucketName}/lambdas/bucket-lambda/*"
+
+  BucketLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: BucketLambda
+      Handler: lambdas/bucket-lambda.lambda.handler
+      Role: !GetAtt [BucketLambdaRole, Arn]
+      Code:
+        S3Bucket: !Ref LambdaBucketName
+        S3Key: lambdas/bucket-lambda/lambda.py
+      Runtime: python3.9
+
+  PresignedURLLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-PresignedURLLambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaFunctionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${LambdaBucketName}/lambdas/presigned-url-function/*"
+
+  PresignedURLLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: PresignedURLLambda
+      Handler: lambdas/presigned-url.lambda.handler
+      Role: !GetAtt [PresignedURLLambdaRole, Arn]
+      Code:
+        S3Bucket: !Ref LambdaBucketName
+        S3Key: lambdas/presigned-url/lambda.py
+      Runtime: python3.9
+
+  MyApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: MyExampleApi
+
+  BucketLambdaApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId: !GetAtt [MyApiGateway, RootResourceId]
+      RestApiId:
+        Ref: MyApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BucketLambdaFunction.Arn}/invocations"
+
+  PresignedURLLambdaApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RequestParameters:
+        method.request.querystring.bucket: true
+        method.request.querystring.key: true
+        method.request.querystring.folder: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId: !GetAtt [MyApiGateway, RootResourceId]
+      RestApiId:
+        Ref: MyApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PresignedURLLambdaFunction.Arn}/invocations"
