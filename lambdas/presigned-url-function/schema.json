@@ -1,0 +1,61 @@
+{
+	"definitions": {},
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Root",
+	"type": "object",
+	"required": [
+		"files"
+	],
+	"properties": {
+		"files": {
+			"$id": "#root/files",
+			"title": "Files",
+			"type": "array",
+			"default": [],
+			"minItems": 1,
+			"items":{
+				"$id": "#root/files/items",
+				"title": "Items",
+				"type": "object",
+				"required": [
+					"bucket",
+					"folder",
+					"file_name"
+				],
+				"properties": {
+					"bucket": {
+						"$id": "#root/files/items/bucket",
+						"title": "Bucket",
+						"type": "string",
+						"default": "",
+						"examples": [
+							"bucket-name"
+						],
+						"pattern": "^(?!\\.)[a-z0-9\\-.]{3,63}(?<!\\.)$"
+					},
+					"folder": {
+						"$id": "#root/files/items/folder",
+						"title": "Folder",
+						"type": "string",
+						"default": "",
+						"examples": [
+							"folder/dir1"
+						],
+						"pattern": "^(?!\\/)[a-zA-Z0-9\\-_.\\/]+(?!\\/)$"
+					},
+					"file_name": {
+						"$id": "#root/files/items/file_name",
+						"title": "File_name",
+						"type": "string",
+						"default": "",
+						"examples": [
+							"sample.jpg"
+						],
+						"pattern": "^[a-zA-Z0-9\\-_.]+$"
+					}
+				}
+			}
+
+		}
+	}
+}
