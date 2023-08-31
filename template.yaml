@@ -8,10 +8,10 @@ Resources:
 #      Name: PreSignedUrlGeneratorAPI
 #      ProtocolType: HTTP
 
-  AccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
+#  AccessLogGroup:
+#    Type: AWS::Logs::LogGroup
+#    Properties:
+#      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
 
   PreSignedUrlGeneratorExecutionRole:
     Type: AWS::IAM::Role
@@ -87,13 +87,18 @@ Resources:
 #      RouteKey: 'POST /files'
 #      Target: !Sub integrations/${APIIntegration}
 
+  NEWAPIGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: NEWAPIGateway
+
   APIStage:
     Type: AWS::ApiGatewayV2::Stage
     DependsOn: APIRoute
     Properties:
       StageName: Prod
       Description: Production Stage
-      ApiId: !Ref PreSignedUrlGeneratorAPI
+      ApiId: !Ref NEWAPIGateway
       AutoDeploy: true
       AccessLogSettings:
         DestinationArn: !GetAtt AccessLogGroup.Arn
@@ -103,12 +108,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn: APIStage
     Properties:
-      ApiId: !Ref PreSignedUrlGeneratorAPI
-
-  NEWAPIGateway:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: NEWAPIGateway
+      ApiId: !Ref NEWAPIGateway
 
   PresignedURLLambdaApiMethod:
     Type: AWS::ApiGateway::Method
