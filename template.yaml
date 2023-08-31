@@ -81,6 +81,7 @@ Resources:
 
   ApiMethod:
     Type: AWS::ApiGateway::Method
+    DependsOn: PreSignedUrlGeneratorAPI
     Properties:
       AuthorizationType: NONE
       HttpMethod: POST
