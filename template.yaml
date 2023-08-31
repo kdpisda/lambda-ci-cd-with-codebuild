@@ -85,7 +85,7 @@ Resources:
     Properties:
       AuthorizationType: NONE
       HttpMethod: POST
-      ResourceId: !GetAtt PreSignedUrlGeneratorAPI
+      ResourceId: !GetAtt PreSignedUrlGeneratorAPI.RootResourceId
       RestApiId: !Ref PreSignedUrlGeneratorAPI
       Integration:
         IntegrationHttpMethod: POST
