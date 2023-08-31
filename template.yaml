@@ -108,9 +108,10 @@ Resources:
   LambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      Action: "lambda:InvokeFunction"
+      Action: lambda:InvokeFunction
       FunctionName: !GetAtt PreSignedUrlGeneratorFunction.Arn
-      Principal: "apigateway.amazonaws.com"
+      Principal: apigateway.amazonaws.com
+      RouteKey: 'POST /files'
 
 Outputs:
   ApiUrl:
