@@ -63,6 +63,11 @@ Resources:
       Description: Production Stage
       ApiId: !Ref PreSignedUrlGeneratorAPI
 
+  APIDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+
 Outputs:
   ApiUrl:
     Description: URL of the created API
