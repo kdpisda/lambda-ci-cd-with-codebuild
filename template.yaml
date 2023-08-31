@@ -7,6 +7,14 @@ Resources:
     Properties:
       Name: PreSignedUrlGeneratorAPI
       ProtocolType: HTTP
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn  # Reference the CloudWatch Logs group ARN
+        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status"}'
+
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
 
   PreSignedUrlGeneratorExecutionRole:
     Type: AWS::IAM::Role
@@ -19,6 +27,8 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
         - PolicyName: LambdaS3AccessPolicy
           PolicyDocument:
