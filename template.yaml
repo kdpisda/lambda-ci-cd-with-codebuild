@@ -42,7 +42,7 @@ Resources:
     Properties:
       FunctionName: PreSignedUrlGeneratorFunction
       Runtime: python3.11
-      Handler: lambda_function.lambda_handler
+      Handler: lambda.lambda_handler
       Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
       TracingConfig:
         Mode: Active
