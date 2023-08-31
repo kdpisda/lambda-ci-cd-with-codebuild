@@ -41,7 +41,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: PreSignedUrlGeneratorFunction
-      Runtime: python3.8
+      Runtime: python3.11
       Handler: lambda_function.lambda_handler
       Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
       TracingConfig:
@@ -50,15 +50,6 @@ Resources:
         S3Bucket: kd-freelancing
         S3Key: lambdas/presigned-url-function.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
-      DependsOn: PreSignedUrlGeneratorAPI
-      Properties:
-        ResourcePolicy:
-          Statement:
-            - Effect: Allow
-              Action: lambda:InvokeFunction
-              Principal:
-                Service: apigateway.amazonaws.com
-              SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PreSignedUrlGeneratorAPI}/*/*/*"
 
   PreSignedUrlGeneratorFunctionExecutionPolicy:
     Type: AWS::IAM::Policy
@@ -98,7 +89,7 @@ Resources:
       Description: Production Stage
       ApiId: !Ref PreSignedUrlGeneratorAPI
       AccessLogSettings:
-        DestinationArn: !GetAtt AccessLogGroup.Arn  # Reference the CloudWatch Logs group ARN
+        DestinationArn: !GetAtt AccessLogGroup.Arn
         Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
 
   APIDeployment:
