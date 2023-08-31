@@ -88,6 +88,7 @@ Resources:
       StageName: Prod
       Description: Production Stage
       ApiId: !Ref PreSignedUrlGeneratorAPI
+      AutoDeploy: true
       AccessLogSettings:
         DestinationArn: !GetAtt AccessLogGroup.Arn
         Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
