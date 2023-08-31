@@ -43,6 +43,7 @@ Resources:
       FunctionName: PreSignedUrlGeneratorFunction
       Runtime: python3.11
       Handler: lambda.lambda_handler
+      Timeout: 30
       Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
       TracingConfig:
         Mode: Active
