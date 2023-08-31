@@ -52,11 +52,6 @@ Resources:
         S3Key: lambdas/presigned-url-function.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
 
-  PreSignedUrlGeneratorVersion:
-    Type: AWS::Lambda::Version
-    Properties:
-      FunctionName: !Ref PreSignedUrlGeneratorFunction
-
   PreSignedUrlGeneratorFunctionExecutionPolicy:
     Type: AWS::IAM::Policy
     Properties:
