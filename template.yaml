@@ -38,23 +38,24 @@ Resources:
       Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
       Code:
         S3Bucket: kd-freelancing
-        S3Key: lambdas/presigned-url-function/lambda.py
+        S3Key: lambdas/presigned-url-function.zip
 
   APIIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
-      IntegrationType: HTTP
+      IntegrationType: AWS_PROXY
       IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
 
   APIRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
       RouteKey: 'POST /files'
-      Target: !Sub integrations/${APIIntegration.Id}
+      Target: !Sub integrations/${APIIntegration}
 
 Outputs:
   ApiUrl:
     Description: URL of the created API
-    Value: !Sub "https://${PreSignedUrlGeneratorAPI.Id}.execute-api.${AWS::Region}.amazonaws.com/files/"
+    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/files/"
