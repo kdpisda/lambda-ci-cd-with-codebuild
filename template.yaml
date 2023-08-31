@@ -43,7 +43,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
-      IntegrationType: AWS_PROXY
+      IntegrationType: HTTP
       IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
 
   APIRoute:
