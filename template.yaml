@@ -80,11 +80,11 @@ Resources:
       PayloadFormatVersion: "2.0"
 
   ApiMethod:
-    Type: "AWS::ApiGateway::Method"
+    Type: AWS::ApiGateway::Method
     Properties:
       AuthorizationType: NONE
       HttpMethod: POST
-      ResourceId: !GetAtt PreSignedUrlGeneratorAPI.RootResourceId
+      ResourceId: !GetAtt PreSignedUrlGeneratorAPI
       RestApiId: !Ref PreSignedUrlGeneratorAPI
       Integration:
         IntegrationHttpMethod: POST
