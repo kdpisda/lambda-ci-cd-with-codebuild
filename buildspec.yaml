@@ -12,7 +12,10 @@ phases:
           if [ -d "$dir" ]; then
             folder_name=$(basename "$dir")
             zip -r "$folder_name.zip" -j "$dir"/*
-            aws s3 cp "$folder_name.zip" s3://$LambdaBucketName/lambdas/"$folder_name.zip"
+            aws s3 cp "$folder_name.zip" "s3://$LambdaBucketName/lambdas/$folder_name.zip"
             rm "$folder_name.zip"
+            # Store version information in SSM Parameter
+            version=$(aws s3api head-object --bucket $LambdaBucketName --key "lambdas/$folder_name.zip" --query 'VersionId' --output text)
+            aws ssm put-parameter --name "LambdaVersion_$folder_name" --value "$version" --type String --overwrite
           fi
         done

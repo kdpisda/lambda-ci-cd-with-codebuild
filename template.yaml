@@ -39,6 +39,7 @@ Resources:
       Code:
         S3Bucket: kd-freelancing
         S3Key: lambdas/presigned-url-function.zip
+        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function:1}}"
 
   APIIntegration:
     Type: AWS::ApiGatewayV2::Integration
