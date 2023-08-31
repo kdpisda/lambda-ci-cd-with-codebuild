@@ -96,6 +96,7 @@ Resources:
 
   APIDeployment:
     Type: AWS::ApiGatewayV2::Deployment
+    DependsOn: APIRoute
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
 
