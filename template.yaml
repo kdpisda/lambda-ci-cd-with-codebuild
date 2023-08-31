@@ -130,7 +130,7 @@ Resources:
       FunctionName: !GetAtt PreSignedUrlGeneratorFunction.Arn
       Principal: "apigateway.amazonaws.com"
 
-Outputs:
-  ApiUrl:
-    Description: URL of the created API
-    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
+#Outputs:
+#  ApiUrl:
+#    Description: URL of the created API
+#    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
