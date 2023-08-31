@@ -7,9 +7,6 @@ Resources:
     Properties:
       Name: PreSignedUrlGeneratorAPI
       ProtocolType: HTTP
-      AccessLogSettings:
-        DestinationArn: !GetAtt AccessLogGroup.Arn  # Reference the CloudWatch Logs group ARN
-        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status"}'
 
   AccessLogGroup:
     Type: AWS::Logs::LogGroup
