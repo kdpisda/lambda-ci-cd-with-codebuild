@@ -100,9 +100,9 @@ Resources:
       Description: Production Stage
       ApiId: !Ref NEWAPIGateway
       AutoDeploy: true
-      AccessLogSettings:
-        DestinationArn: !GetAtt AccessLogGroup.Arn
-        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
+#      AccessLogSettings:
+#        DestinationArn: !GetAtt AccessLogGroup.Arn
+#        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
 
   APIDeployment:
     Type: AWS::ApiGatewayV2::Deployment
