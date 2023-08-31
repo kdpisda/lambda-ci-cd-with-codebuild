@@ -39,6 +39,7 @@ Resources:
 
   PreSignedUrlGeneratorFunction:
     Type: AWS::Lambda::Function
+    DependsOn: PreSignedUrlGeneratorExecutionRole
     Properties:
       FunctionName: PreSignedUrlGeneratorFunction
       Runtime: python3.11
@@ -54,6 +55,7 @@ Resources:
 
   PreSignedUrlGeneratorFunctionExecutionPolicy:
     Type: AWS::IAM::Policy
+    DependsOn: PreSignedUrlGeneratorFunction
     Properties:
       PolicyName: PreSignedUrlGeneratorFunctionExecutionPolicy
       Roles:
@@ -70,6 +72,7 @@ Resources:
 
   APIIntegration:
     Type: AWS::ApiGatewayV2::Integration
+    DependsOn: PreSignedUrlGeneratorAPI, PreSignedUrlGeneratorFunctionExecutionPolicy
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
       IntegrationType: AWS_PROXY
@@ -78,6 +81,7 @@ Resources:
 
   APIRoute:
     Type: AWS::ApiGatewayV2::Route
+    DependsOn: PreSignedUrlGeneratorAPI, APIIntegration
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
       RouteKey: 'POST /files'
@@ -85,6 +89,7 @@ Resources:
 
   APIStage:
     Type: AWS::ApiGatewayV2::Stage
+    DependsOn: PreSignedUrlGeneratorAPI, APIRoute
     Properties:
       StageName: Prod
       Description: Production Stage
@@ -96,7 +101,7 @@ Resources:
 
   APIDeployment:
     Type: AWS::ApiGatewayV2::Deployment
-    DependsOn: APIRoute
+    DependsOn: APIStage
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
 
