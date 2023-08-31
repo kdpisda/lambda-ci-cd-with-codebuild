@@ -2,16 +2,16 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Setup API Gateway with Lambda integration for POST request
 
 Resources:
-#  PreSignedUrlGeneratorAPI:
-#    Type: AWS::ApiGatewayV2::Api
-#    Properties:
-#      Name: PreSignedUrlGeneratorAPI
-#      ProtocolType: HTTP
+  PreSignedUrlGeneratorAPI:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: PreSignedUrlGeneratorAPI
+      ProtocolType: HTTP
 
-#  AccessLogGroup:
-#    Type: AWS::Logs::LogGroup
-#    Properties:
-#      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
 
   PreSignedUrlGeneratorExecutionRole:
     Type: AWS::IAM::Role
@@ -70,27 +70,35 @@ Resources:
               - logs:PutLogEvents
             Resource: "*"
 
-#  APIIntegration:
-#    Type: AWS::ApiGatewayV2::Integration
-#    DependsOn: PreSignedUrlGeneratorFunction
-#    Properties:
-#      ApiId: !Ref PreSignedUrlGeneratorAPI
-#      IntegrationType: AWS_PROXY
-#      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
-#      PayloadFormatVersion: "2.0"
-
-#  APIRoute:
-#    Type: AWS::ApiGatewayV2::Route
-#    DependsOn: APIIntegration
-#    Properties:
-#      ApiId: !Ref PreSignedUrlGeneratorAPI
-#      RouteKey: 'POST /files'
-#      Target: !Sub integrations/${APIIntegration}
-
-  NEWAPIGateway:
-    Type: AWS::ApiGateway::RestApi
+  APIIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    DependsOn: PreSignedUrlGeneratorFunction
     Properties:
-      Name: NEWAPIGateway
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+
+  ApiMethod:
+    Type: AWS::ApiGateway::Method
+    DependsOn: PreSignedUrlGeneratorAPI
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !GetAtt PreSignedUrlGeneratorAPI.RootResourceId
+      RestApiId: !Ref PreSignedUrlGeneratorAPI
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
+
+  APIRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn: APIIntegration
+    Properties:
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+      RouteKey: 'POST /files'
+      Target: !Sub integrations/${APIIntegration}
 
   APIStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -98,30 +106,17 @@ Resources:
     Properties:
       StageName: Prod
       Description: Production Stage
-      ApiId: !Ref NEWAPIGateway
+      ApiId: !Ref PreSignedUrlGeneratorAPI
       AutoDeploy: true
-#      AccessLogSettings:
-#        DestinationArn: !GetAtt AccessLogGroup.Arn
-#        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn
+        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
 
   APIDeployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn: APIStage
     Properties:
-      ApiId: !Ref NEWAPIGateway
-
-  PresignedURLLambdaApiMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      HttpMethod: POST
-      ResourceId: !GetAtt [ NEWAPIGateway, RootResourceId ]
-      RestApiId:
-        Ref: NEWAPIGateway
-      Integration:
-        IntegrationHttpMethod: POST
-        Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
+      ApiId: !Ref PreSignedUrlGeneratorAPI
 
   LambdaPermission:
     Type: AWS::Lambda::Permission
@@ -130,7 +125,7 @@ Resources:
       FunctionName: !GetAtt PreSignedUrlGeneratorFunction.Arn
       Principal: "apigateway.amazonaws.com"
 
-#Outputs:
-#  ApiUrl:
-#    Description: URL of the created API
-#    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
+Outputs:
+  ApiUrl:
+    Description: URL of the created API
+    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
