@@ -79,19 +79,6 @@ Resources:
       IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
       PayloadFormatVersion: "2.0"
 
-  ApiMethod:
-    Type: AWS::ApiGateway::Method
-    DependsOn: PreSignedUrlGeneratorAPI
-    Properties:
-      AuthorizationType: NONE
-      HttpMethod: POST
-      ResourceId: !GetAtt PreSignedUrlGeneratorAPI.RootResourceId
-      RestApiId: !Ref PreSignedUrlGeneratorAPI
-      Integration:
-        IntegrationHttpMethod: POST
-        Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
-
   APIRoute:
     Type: AWS::ApiGatewayV2::Route
     DependsOn: APIIntegration
