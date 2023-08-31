@@ -50,6 +50,15 @@ Resources:
         S3Bucket: kd-freelancing
         S3Key: lambdas/presigned-url-function.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
+      DependsOn: PreSignedUrlGeneratorAPI
+      Properties:
+        ResourcePolicy:
+          Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Principal:
+                Service: apigateway.amazonaws.com
+              SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PreSignedUrlGeneratorAPI}/*/*/*"
 
   PreSignedUrlGeneratorFunctionExecutionPolicy:
     Type: AWS::IAM::Policy
