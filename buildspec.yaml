@@ -7,4 +7,4 @@ env:
 phases:
   build:
     commands:
-      - aws s3 cp lambdas s3://$LambdaBucketName/lambdas/ --recursive
+      - aws s3 cp lambdas s3://$LambdaBucketName/lambdas/ --recursive --debug
