@@ -40,17 +40,22 @@ Resources:
         S3Bucket: kd-freelancing
         S3Key: lambdas/presigned-url-function.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
-      Policies:
-        - PolicyName: AWSLambdaBasicExecutionRole  # Add this line
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
+
+  PreSignedUrlGeneratorFunctionExecutionPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: PreSignedUrlGeneratorFunctionExecutionPolicy
+      Roles:
+        - !Ref PreSignedUrlGeneratorExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
 
   APIIntegration:
     Type: AWS::ApiGatewayV2::Integration
