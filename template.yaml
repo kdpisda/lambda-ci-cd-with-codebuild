@@ -1,11 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Setup API Gateway with Lambda integration for POST request
 
-Parameters:
-  S3BucketName:
-    Type: String
-    Description: Name of the S3 bucket where Lambda code resides
-
 Resources:
   PreSignedUrlGeneratorAPI:
     Type: AWS::ApiGatewayV2::Api
@@ -31,7 +26,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::${S3BucketName}/*"
+                Resource: "arn:aws:s3:::kd-freelancing/*"
 
   PreSignedUrlGeneratorFunction:
     Type: AWS::Lambda::Function
