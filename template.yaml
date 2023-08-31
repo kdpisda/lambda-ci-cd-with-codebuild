@@ -56,7 +56,14 @@ Resources:
       RouteKey: 'POST /files'
       Target: !Sub integrations/${APIIntegration}
 
+  APIStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: Production Stage
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+
 Outputs:
   ApiUrl:
     Description: URL of the created API
-    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/files/"
+    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
