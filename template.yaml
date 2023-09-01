@@ -1,6 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Setup API Gateway with Lambda integration for POST request
 
+Parameters:
+  LambdaBucketName:
+    Description: The name of the S3 bucket where the lambda will be stored
+    Type: String
+
+  SourceBucketName:
+    Description: The name of the S3 bucket for which we will generate the pre-signed URL
+    Type: String
+
+  StageName:
+    Description: The name of the stage for the API Gateway
+    Type: String
+
 Resources:
   PreSignedUrlGeneratorAPI:
     Type: AWS::ApiGatewayV2::Api
@@ -35,7 +48,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject
-                Resource: "arn:aws:s3:::kd-freelancing/*"
+                Resource: !Sub "arn:aws:s3:::${SourceBucketName}/*"
 
   PreSignedUrlGeneratorFunction:
     Type: AWS::Lambda::Function
@@ -49,7 +62,7 @@ Resources:
       TracingConfig:
         Mode: Active
       Code:
-        S3Bucket: kd-freelancing
+        S3Bucket: !Ref LambdaBucketName
         S3Key: lambdas/presigned-url-function.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
 
@@ -91,7 +104,7 @@ Resources:
     Type: AWS::ApiGatewayV2::Stage
     DependsOn: APIRoute
     Properties:
-      StageName: Prod
+      StageName: !Ref StageName
       Description: Production Stage
       ApiId: !Ref PreSignedUrlGeneratorAPI
       AutoDeploy: true
@@ -115,4 +128,4 @@ Resources:
 Outputs:
   ApiUrl:
     Description: URL of the created API
-    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod/files/"
+    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/files/"
