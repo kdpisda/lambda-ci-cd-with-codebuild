@@ -1,107 +1,209 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation template for Lambda functions and API Gateway
-
-Parameters:
-  LambdaBucketName:
-    Type: String
-    Description: The name of the S3 bucket containing lambda code
+Description: This CloudFormation template provisions s3 bucket & lambda for folder structure
 
 Resources:
-  BucketLambdaRole:
+  LambdaFunctionInvoke:
+    Type: "Custom::LambdaTrigger"
+    DependsOn: BucketLambda
+    Properties:
+      ServiceToken: !GetAtt BucketLambda.Arn
+
+  BucketLambda:
+    DependsOn: LambdaExecutionRole
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-BucketFolderCreation"
+      Description: You created this resource by running Cloudformation Template.
+      Code:
+        ZipFile: |
+          import sys
+          from pip._internal import main
+
+          main(['install', '-I', '-q', 'pyyaml', '--target', '/tmp/', '--no-cache-dir', '--disable-pip-version-check'])
+          sys.path.insert(0, '/tmp/')
+          import os, boto3, yaml
+          import urllib.request
+          import cfnresponse
+
+          def lambda_handler(event, context):
+                CONFIG_BUCKET = os.getenv('CONFIG_BUCKET_NAME')
+                CONFIG_FILE = os.getenv('CONFIG_FILENAME')
+                ENV = os.getenv('DEPLOYED_ENV')
+                print(event)
+
+                s3 = boto3.client('s3')
+                s3_res = boto3.resource('s3')
+                def bucket_upload():
+                      # Check if the bucket exists before trying to create it
+                      obj = s3_res.Object(CONFIG_BUCKET, CONFIG_FILE)
+                      response = obj.get()
+
+                      # Read the contents of the file
+                      file_contents = response['Body'].read().decode('utf-8')
+                      data = yaml.safe_load(file_contents)	
+
+                      for entry in data.get(ENV, []):
+                            for bucket_name, folder_structure in entry.items():
+                                  try:
+                                        # Check if the bucket exists
+                                        s3.head_bucket(Bucket=bucket_name)
+                                        print(f"Bucket {bucket_name} already exists.")
+                            
+                                        # Create the folder structure inside the bucket
+                                        for folder_name, folder_path in folder_structure[0].items():
+                                              s3.put_object(Bucket=bucket_name, Key=folder_path + '/')
+                                  except Exception as e:
+                                        # Create the bucket
+                                        s3.create_bucket(Bucket=bucket_name)
+                                        print(f"Bucket {bucket_name} created successfully.")
+                                        
+                                        # Create the folder structure inside the bucket
+                                        for folder_name, folder_path in folder_structure[0].items():
+                                              s3.put_object(Bucket=bucket_name, Key=folder_path + '/')		
+                if event:     
+                      try:					
+                                  bucket_upload()
+                            # Call the upload function and store the result
+                                  responseValue = 120
+                                  responseData = {}
+                                  responseData['Data'] = responseValue
+                                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, 'LambdaFunctionInvoke')        
+                                  return {
+                                        'statusCode': 200,
+                                        'body': 'Buckets Created & Folders Uploaded successfully'
+                                  }
+                      except Exception as e:
+                                  error_message = str(e)
+                                  print(f"Error creating bucket: {error_message}")
+                                  responseValue = 120
+                                  responseData = {}
+                                  responseData['Data'] = responseValue
+                                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, 'LambdaFunctionInvoke')        
+                                  return error_message
+                if not event:
+                      try:
+                                  print('No Event Passed. Invoked by pipeline')
+                                  bucket_upload()
+                      except Exception as e:
+                                  error_message = str(e)
+                                  return error_message
+      Handler: index.lambda_handler
+      Role: !GetAtt [LambdaExecutionRole, Arn]
+      Runtime: python3.9
+      Environment:
+        Variables:
+          CONFIG_BUCKET_NAME: configfoldercreate
+          CONFIG_FILENAME: bucket_config.yaml
+          DEPLOYED_ENV: dev
+      Timeout: 300
+
+  LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-BucketLambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "s3:ListBucket"
+                  - "s3:CreateBucket"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource: "*"
+
+  PresignedUrlFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-PresignedUrlFunction"
+      Description: Lambda function to generate pre-signed URLs
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+
+          def lambda_handler(event, context):
+              s3 = boto3.client('s3')
+              
+              bucket_name = event.get('queryStringParameters', {}).get('bucket')
+              key = event.get('queryStringParameters', {}).get('key')
+              folder = event.get('queryStringParameters', {}).get('folder')
+              
+              try:
+                  # Check if the bucket exists
+                  s3.head_bucket(Bucket=bucket_name)
+                  
+                  # Generate a pre-signed URL for object upload
+                  presigned_url = s3.generate_presigned_url(
+                      'put_object',
+                      Params={'Bucket': bucket_name, 'Key': f'{folder}/{key}'},
+                      ExpiresIn=3600  # URL expiration time in seconds
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({'presignedUrl': presigned_url})
+                  }
+              except Exception as e:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': f'Error: {str(e)}'})
+                  }
+      Handler: index.lambda_handler
+      Role: !GetAtt [PresignedUrlExecutionRole, Arn]
+      Runtime: python3.9
+      Timeout: 30
+
+  PresignedUrlExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
+            Action:
+              - "sts:AssumeRole"
+      Path: /
       Policies:
-        - PolicyName: LambdaFunctionPolicy
+        - PolicyName: presignedUrlPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::${LambdaBucketName}/lambdas/bucket-lambda/*"
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "s3:ListBucket"
+                  - "s3:CreateBucket"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "lambda:InvokeFunction"
+                Resource: "*"
 
-  BucketLambdaFunction:
-    Type: AWS::Lambda::Function
+  PresignedUrlResource:
+    Type: AWS::ApiGateway::Resource
     Properties:
-      FunctionName: BucketLambda
-      Handler: lambdas/bucket-lambda.lambda.handler
-      Role: !GetAtt [BucketLambdaRole, Arn]
-      Code:
-        S3Bucket: !Ref LambdaBucketName
-        S3Key: lambdas/bucket-lambda/lambda.py
-      Runtime: python3.9
-
-  PresignedURLLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AWS::StackName}-PresignedURLLambdaRole"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: LambdaFunctionPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::${LambdaBucketName}/lambdas/presigned-url-function/*"
-
-  PresignedURLLambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: PresignedURLLambda
-      Handler: lambdas/presigned-url.lambda.handler
-      Role: !GetAtt [PresignedURLLambdaRole, Arn]
-      Code:
-        S3Bucket: !Ref LambdaBucketName
-        S3Key: lambdas/presigned-url/lambda.py
-      Runtime: python3.9
-
-  MyApiGateway:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: MyExampleApi
-
-  BucketLambdaApiMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      HttpMethod: GET
-      ResourceId: !GetAtt [MyApiGateway, RootResourceId]
-      RestApiId:
-        Ref: MyApiGateway
-      Integration:
-        IntegrationHttpMethod: POST
-        Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BucketLambdaFunction.Arn}/invocations"
-
-  PresignedURLLambdaApiMethod:
+      ParentId: !GetAtt PresignedUrlApiGateway.RootResourceId
+      PathPart: "presignedUrl"
+      RestApiId: !Ref PresignedUrlApiGateway
+  PresignedUrlGetMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RequestParameters:
@@ -110,10 +212,249 @@ Resources:
         method.request.querystring.folder: true
       AuthorizationType: NONE
       HttpMethod: GET
-      ResourceId: !GetAtt [MyApiGateway, RootResourceId]
-      RestApiId:
-        Ref: MyApiGateway
+      ResourceId: !Ref PresignedUrlResource
+      RestApiId: !Ref PresignedUrlApiGateway
       Integration:
+        RequestParameters:
+          integration.request.querystring.bucket: "method.request.querystring.bucket"
+          integration.request.querystring.key: "method.request.querystring.key"
+          integration.request.querystring.folder: "method.request.querystring.folder"
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PresignedURLLambdaFunction.Arn}/invocations"
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PresignedUrlFunction.Arn}/invocations
+        RequestTemplates:
+          "application/json": '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+
+  PresignedUrlApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${AWS::StackName}-PresignedUrlApi"
+
+  ConfigLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    DependsOn:
+      - ApiGatewayRestApi
+      - PresignedUrlFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PresignedUrlFunction
+      Principal: apigateway.amazonaws.com
+
+  ########################### API GATEWAY #################################
+  ApiGatewayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - lambda:InvokeFunction
+                Resource: "*"
+
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${AWS::StackName}-S3UploadAPI"
+      BinaryMediaTypes:
+        - "*/*"
+
+  FolderResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "{folder}"
+      RestApiId: !Ref ApiGatewayRestApi
+
+  SubFolderResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !Ref FolderResource
+      PathPart: "ARCHIVE"
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ObjectResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !Ref SubFolderResource
+      PathPart: "{item}"
+      RestApiId: !Ref ApiGatewayRestApi
+
+  PutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: PUT
+      RequestParameters:
+        method.request.path.folder: true
+        method.request.path.item: true
+      ResourceId: !Ref ObjectResource
+      RestApiId: !Ref ApiGatewayRestApi
+      Integration:
+        IntegrationHttpMethod: PUT
+        Type: AWS
+        Credentials: !GetAtt ApiGatewayRole.Arn
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:s3:path/{bucket}/ARCHIVE/{key}
+        RequestParameters:
+          integration.request.path.bucket: method.request.path.folder
+          integration.request.path.key: method.request.path.item
+        IntegrationResponses:
+          - StatusCode: 200
+      MethodResponses:
+        - StatusCode: "200"
+
+  ApiGatewayDeployment:
+    DependsOn: PutMethod
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: v1
+
+  ####################### KINESIS ################################
+  KinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Sub "${AWS::StackName}DataStream"
+      RetentionPeriodHours: 24
+      ShardCount: 1
+
+  ####################### SNS #####################################
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${AWS::StackName}-sns-topic"
+
+  ########################## EVENTBRIDGE ##########################
+
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AWS::StackName}-EventRule"
+      EventPattern:
+        source:
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+      State: ENABLED
+      Targets:
+        - Id: SNSTarget
+          Arn: !GetAtt SNSTopic.TopicArn
+
+  ########################## SQS #################################
+
+  SQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      QueueName: !Sub "${AWS::StackName}-SQSQueue"
+
+  ######################### Transfer Family #######################
+
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${AWS::AccountId}"
+      AccessControl: Private
+
+  TransferRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+            Action: sts:AssumeRole
+
+  TransferLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-TransferFamilyLogging"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: "*"
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: "*"
+
+  TransferUserPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-TransferFamilyUser"
+      Roles:
+        - !Ref TransferRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowListingOfUserFolder
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Effect: Allow
+            Resource: !Sub "arn:aws:s3:::${MyS3Bucket}"
+          - Sid: HomeDirObjectAccess
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObjectVersion
+              - s3:DeleteObject
+              - s3:GetObjectVersion
+            Resource: !Sub "arn:aws:s3:::${MyS3Bucket}/*"
+
+  MyTransferServer:
+    Type: AWS::Transfer::Server
+    Properties:
+      IdentityProviderType: SERVICE_MANAGED
+      EndpointType: PUBLIC
+      LoggingRole: !GetAtt TransferLoggingRole.Arn
+      Protocols:
+        - SFTP
+
+################### CF OUTPUTS ##################################
+
+Outputs:
+  Region:
+    Value: !Sub "${AWS::Region}"
+
+  Lambda:
+    Value: !Ref BucketLambda
+
+  ApiUrl:
+    Description: URL of the deployed API
+    Value:
+      Fn::Sub: https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/v1/{bucket}/{key}
+
+  TransferServerId:
+    Description: ID of the created AWS Transfer Family server
+    Value: !Ref MyTransferServer
+
+  PresignedUrlApiUrl:
+    Description: URL of the presignedUrl endpoint
+    Value: !Sub "https://${PresignedUrlApiGateway}.execute-api.${AWS::Region}.amazonaws.com/v1/presignedUrl"

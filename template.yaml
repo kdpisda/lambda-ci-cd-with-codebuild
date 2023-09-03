@@ -18,7 +18,7 @@ Resources:
   PreSignedUrlGeneratorAPI:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: PreSignedUrlGeneratorAPI
+      Name: !Sub "${AWS::StackName}-PreSignedUrlGeneratorAPI"
       ProtocolType: HTTP
 
   AccessLogGroup:
@@ -54,7 +54,7 @@ Resources:
     Type: AWS::Lambda::Function
     DependsOn: PreSignedUrlGeneratorExecutionRole
     Properties:
-      FunctionName: PreSignedUrlGeneratorFunction
+      FunctionName: !Sub "${AWS::StackName}-PreSignedUrlGeneratorFunction"
       Runtime: python3.11
       Handler: lambda.lambda_handler
       Timeout: 30
@@ -70,7 +70,7 @@ Resources:
     Type: AWS::IAM::Policy
     DependsOn: PreSignedUrlGeneratorExecutionRole
     Properties:
-      PolicyName: PreSignedUrlGeneratorFunctionExecutionPolicy
+      PolicyName: !Sub "${AWS::StackName}-PreSignedUrlGeneratorFunctionExecutionPolicy"
       Roles:
         - !Ref PreSignedUrlGeneratorExecutionRole
       PolicyDocument:
@@ -120,9 +120,13 @@ Resources:
 
   LambdaPermission:
     Type: AWS::Lambda::Permission
+    DependsOn:
+      - APIRoute
+      - APIStage
+      - PreSignedUrlGeneratorFunction
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !GetAtt PreSignedUrlGeneratorFunction.Arn
+      FunctionName: !Ref PreSignedUrlGeneratorFunction
       Principal: apigateway.amazonaws.com
 
 Outputs:
