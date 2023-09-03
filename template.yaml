@@ -61,6 +61,9 @@ Resources:
       Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
       TracingConfig:
         Mode: Active
+      Environment:
+        Variables:
+          EXPIRES_IN: 3600
       Code:
         S3Bucket: !Ref LambdaBucketName
         S3Key: lambdas/presigned-url-function.zip

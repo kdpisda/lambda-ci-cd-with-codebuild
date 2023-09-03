@@ -1,5 +1,23 @@
 import json
+import os
 import boto3
+
+
+def check_and_create_path(s3_client, bucket_name, path):
+    """
+    This function checks if the path exists in the bucket and creates it if it doesn't.
+    :param s3_client:
+    :param bucket_name:
+    :param path:
+    :return:
+    """
+    try:
+        s3_client.head_object(Bucket=bucket_name, Key=path)
+    except Exception as e:
+        if e.response['Error']['Code'] == '404':
+            s3_client.put_object(Bucket=bucket_name, Key=path)
+        else:
+            raise
 
 
 def lambda_handler(event, context):
@@ -16,6 +34,8 @@ def lambda_handler(event, context):
 
     body = json.loads(event['body'])
 
+    expires_in = int(os.getenv('EXPIRES_IN', 3600))
+
     files = body.get('files', [])
     presigned_urls = []
 
@@ -26,14 +46,15 @@ def lambda_handler(event, context):
         folder = file.get('folder')
 
         try:
-            # Check if the bucket exists
-            s3.head_bucket(Bucket=bucket_name)
+            # Check if the folder exists and create it if it doesn't
+            path = f"{folder}/{file_name}"
+            check_and_create_path(s3, bucket_name, path)
 
             # Generate a pre-signed URL for object upload
             presigned_url = s3.generate_presigned_url(
                 'put_object',
-                Params={'Bucket': bucket_name, 'Key': f'{folder}/{file_name}'},
-                ExpiresIn=3600  # URL expiration time in seconds
+                Params={'Bucket': bucket_name, 'Key': path},
+                ExpiresIn=expires_in  # URL expiration time in seconds
             )
             presigned_urls.append({
                 "file": f"s3://{bucket_name}/{folder}/{file_name}",
