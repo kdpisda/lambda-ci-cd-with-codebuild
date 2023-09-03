@@ -29,4 +29,4 @@ phases:
   install:
     commands:
       - echo Deploying resources to target account...
-      - aws cloudformation deploy --template-file templates/prod.yml --stack-name cross-lambda
+      - aws cloudformation deploy --template-file templates/prod.yaml --stack-name cross-lambda --parameter-overrides LambdaBucketName=kd-freelancing SourceBucketName=kd-freelancing StageName=Prod
