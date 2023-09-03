@@ -5,7 +5,7 @@ env:
     LambdaBucketName: "kd-freelancing"
 
 phases:
-  pre-build:
+  pre_build:
     commands:
       - |
         for dir in lambdas/*; do
