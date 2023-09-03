@@ -5,7 +5,7 @@ env:
     LambdaBucketName: "kd-freelancing"
 
 phases:
-  zip-lambda:
+  pre-build:
     commands:
       - |
         for dir in lambdas/*; do
@@ -19,14 +19,14 @@ phases:
             aws ssm put-parameter --name "LambdaVersion_$folder_name" --value "$version" --type String --overwrite
           fi
         done
-  pre_build:
+  build:
     commands:
       - echo Assuming role in target account...
       - aws sts assume-role --role-arn arn:aws:iam::106549696053:role/CDK-codebuild-pipeline-role --role-session-name codebuild-deployment > assume-role-output.json
       - export AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' assume-role-output.json)
       - export AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' assume-role-output.json)
       - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' assume-role-output.json)
-  build:
+  install:
     commands:
       - echo Deploying resources to target account...
       - aws cloudformation deploy --template-file templates/prod.yml --stack-name cross-lambda
