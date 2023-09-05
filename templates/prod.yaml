@@ -132,6 +132,62 @@ Resources:
       FunctionName: !Ref PreSignedUrlGeneratorFunction
       Principal: apigateway.amazonaws.com
 
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "s3:ListBucket"
+                  - "s3:CreateBucket"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource: "*"
+
+  BucketLambda:
+    DependsOn: LambdaExecutionRole
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-BucketFolderCreation"
+      Runtime: python3.11
+      Handler: lambda.lambda_handler
+      Timeout: 300
+      Role: !GetAtt LambdaExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          CONFIG_BUCKET_NAME: configfoldercreate
+          CONFIG_FILENAME: bucket_config.yaml
+          DEPLOYED_ENV: dev
+      Code:
+        S3Bucket: !Ref LambdaBucketName
+        S3Key: lambdas/bucket-folder-creation.zip
+        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-folder-creation}}"
+
+  BucketFolderCreationInvoke:
+    Type: "Custom::LambdaTrigger"
+    DependsOn: BucketLambda
+    Properties:
+      ServiceToken: !GetAtt BucketLambda.Arn
+
 Outputs:
   ApiUrl:
     Description: URL of the created API
