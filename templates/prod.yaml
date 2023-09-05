@@ -182,7 +182,7 @@ Resources:
         S3Key: lambdas/bucket-lambda.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-lambda}}"
 
-  BucketFolderCreationInvoke:
+  LambdaFunctionInvoke:
     Type: "Custom::LambdaTrigger"
     DependsOn: BucketLambda
     Properties:
