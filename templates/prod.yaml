@@ -180,7 +180,7 @@ Resources:
       Code:
         S3Bucket: !Ref LambdaBucketName
         S3Key: lambdas/bucket-folder-creation.zip
-        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-folder-creation}}"
+        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-lambda}}"
 
   BucketFolderCreationInvoke:
     Type: "Custom::LambdaTrigger"
