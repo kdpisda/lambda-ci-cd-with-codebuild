@@ -109,6 +109,7 @@ Resources:
     Properties:
       StageName: !Ref StageName
       Description: Production Stage
+      AutoDeploy: true
       ApiId: !Ref PreSignedUrlGeneratorAPI
       AccessLogSettings:
         DestinationArn: !GetAtt AccessLogGroup.Arn
