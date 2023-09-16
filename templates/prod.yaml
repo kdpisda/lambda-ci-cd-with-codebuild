@@ -183,11 +183,11 @@ Resources:
         S3Key: lambdas/bucket-lambda.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-lambda}}"
 
-  LambdaFunctionInvoke:
-    Type: "Custom::LambdaTrigger"
-    DependsOn: BucketLambda
-    Properties:
-      ServiceToken: !GetAtt BucketLambda.Arn
+#  LambdaFunctionInvoke:
+#    Type: "Custom::LambdaTrigger"
+#    DependsOn: BucketLambda
+#    Properties:
+#      ServiceToken: !GetAtt BucketLambda.Arn
 
 Outputs:
   ApiUrl:
