@@ -60,6 +60,10 @@ def lambda_handler(event, context):
                 "file": f"s3://{bucket_name}/{folder}/{file_name}",
                 "presigned_url": presigned_url
             })
+        except boto3.exceptions.botocore.exceptions.ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_message = e.response['Error']['Message']
+            print(f"Error Code: {error_code}, Error Message: {error_message}")
         except Exception as e:
             # In case of any error we append None to the list for that file
             print(f"Error generating pre-signed URL for {folder}/{file_name}: {e}")
