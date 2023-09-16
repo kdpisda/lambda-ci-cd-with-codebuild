@@ -185,11 +185,115 @@ Resources:
         S3Key: lambdas/bucket-lambda.zip
         S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-lambda}}"
 
-#  LambdaFunctionInvoke:
-#    Type: "Custom::LambdaTrigger"
-#    DependsOn: BucketLambda
-#    Properties:
-#      ServiceToken: !GetAtt BucketLambda.Arn
+  ####################### KINESIS ################################
+  KinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Sub "${AWS::StackName}DataStream"
+      RetentionPeriodHours: 24
+      ShardCount: 1
+
+  ####################### SNS #####################################
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${AWS::StackName}-sns-topic"
+
+  ########################## EVENTBRIDGE ##########################
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AWS::StackName}-EventRule"
+      EventPattern:
+        source:
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+      State: ENABLED
+      Targets:
+        - Id: SNSTarget
+          Arn: !GetAtt SNSTopic.TopicArn
+
+  ########################## SQS #################################
+  SQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      QueueName: !Sub "${AWS::StackName}-SQSQueue"
+
+  ######################### Transfer Family #######################
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${AWS::AccountId}"
+      AccessControl: Private
+
+  TransferRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+            Action: sts:AssumeRole
+
+  TransferLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: transfer.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-TransferFamilyLogging"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: "*"
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: "*"
+
+  TransferUserPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-TransferFamilyUser"
+      Roles:
+        - !Ref TransferRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowListingOfUserFolder
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Effect: Allow
+            Resource: !Sub "arn:aws:s3:::${MyS3Bucket}"
+          - Sid: HomeDirObjectAccess
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObjectVersion
+              - s3:DeleteObject
+              - s3:GetObjectVersion
+            Resource: !Sub "arn:aws:s3:::${MyS3Bucket}/*"
+
+  MyTransferServer:
+    Type: AWS::Transfer::Server
+    Properties:
+      IdentityProviderType: SERVICE_MANAGED
+      EndpointType: PUBLIC
+      LoggingRole: !GetAtt TransferLoggingRole.Arn
+      Protocols:
+        - SFTP
 
 Outputs:
   ApiUrl:
