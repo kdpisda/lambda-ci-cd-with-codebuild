@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Setup API Gateway with Lambda integration for POST request
+
+Parameters:
+  LambdaBucketName:
+    Description: The name of the S3 bucket where the lambda will be stored
+    Type: String
+
+  SourceBucketName:
+    Description: The name of the S3 bucket for which we will generate the pre-signed URL
+    Type: String
+
+  StageName:
+    Description: The name of the stage for the API Gateway
+    Type: String
+
+Resources:
+  PreSignedUrlGeneratorAPI:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-PreSignedUrlGeneratorAPI"
+      ProtocolType: HTTP
+
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/PreSignedUrlGeneratorAPI
+
+  PreSignedUrlGeneratorExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PreSignedUrlGeneratorExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Policies:
+        - PolicyName: LambdaS3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:HeadObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${SourceBucketName}/*"
+                  - !Sub "arn:aws:s3:::${SourceBucketName}"
+
+  PreSignedUrlGeneratorFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: PreSignedUrlGeneratorExecutionRole
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-PreSignedUrlGeneratorFunction"
+      Runtime: python3.11
+      Handler: lambda.lambda_handler
+      Timeout: 30
+      Role: !GetAtt PreSignedUrlGeneratorExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          EXPIRES_IN: 3600
+      Code:
+        S3Bucket: !Ref LambdaBucketName
+        S3Key: lambdas/presigned-url-function.zip
+        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_presigned-url-function}}"
+
+  PreSignedUrlGeneratorFunctionExecutionPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: PreSignedUrlGeneratorExecutionRole
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-PreSignedUrlGeneratorFunctionExecutionPolicy"
+      Roles:
+        - !Ref PreSignedUrlGeneratorExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+  APIIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    DependsOn: PreSignedUrlGeneratorFunction
+    Properties:
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PreSignedUrlGeneratorFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+
+  APIRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn: APIIntegration
+    Properties:
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+      RouteKey: 'POST /files'
+      Target: !Sub integrations/${APIIntegration}
+
+  APIStage:
+    Type: AWS::ApiGatewayV2::Stage
+    DependsOn: APIRoute
+    Properties:
+      StageName: !Ref StageName
+      Description: Production Stage
+      AutoDeploy: true
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn
+        Format: '{"requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","requestId":"$context.requestId"}'
+
+  APIDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn: APIStage
+    Properties:
+      ApiId: !Ref PreSignedUrlGeneratorAPI
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - APIRoute
+      - APIStage
+      - PreSignedUrlGeneratorFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PreSignedUrlGeneratorFunction
+      Principal: apigateway.amazonaws.com
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "s3:ListBucket"
+                  - "s3:CreateBucket"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource: "*"
+
+  BucketLambda:
+    DependsOn: LambdaExecutionRole
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-BucketFolderCreation"
+      Runtime: python3.11
+      Handler: lambda.lambda_handler
+      Timeout: 300
+      Role: !GetAtt LambdaExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          CONFIG_BUCKET_NAME: configfoldercreate
+          CONFIG_FILENAME: bucket_config.yaml
+          DEPLOYED_ENV: dev
+      Code:
+        S3Bucket: !Ref LambdaBucketName
+        S3Key: lambdas/bucket-lambda.zip
+        S3ObjectVersion: "{{resolve:ssm:LambdaVersion_bucket-lambda}}"
+
+#  LambdaFunctionInvoke:
+#    Type: "Custom::LambdaTrigger"
+#    DependsOn: BucketLambda
+#    Properties:
+#      ServiceToken: !GetAtt BucketLambda.Arn
+
+Outputs:
+  ApiUrl:
+    Description: URL of the created API
+    Value: !Sub "https://${PreSignedUrlGeneratorAPI}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/files/"
