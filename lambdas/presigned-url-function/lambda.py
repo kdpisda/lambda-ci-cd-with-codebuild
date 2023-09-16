@@ -61,11 +61,17 @@ def lambda_handler(event, context):
 
         return {
             'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps(response)
         }
 
     except Exception as e:
         return {
             'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps({'error': str(e)})
         }
