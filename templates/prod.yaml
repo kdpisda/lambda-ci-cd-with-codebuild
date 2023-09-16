@@ -52,6 +52,12 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::${SourceBucketName}/*"
                   - !Sub "arn:aws:s3:::${SourceBucketName}"
+              - Effect: Allow
+                Action:
+                  - kms:GenerateDataKey
+                Resource:
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+
 
   PreSignedUrlGeneratorFunction:
     Type: AWS::Lambda::Function
@@ -91,7 +97,9 @@ Resources:
 
   APIIntegration:
     Type: AWS::ApiGatewayV2::Integration
-    DependsOn: PreSignedUrlGeneratorFunction
+    DependsOn:
+      - PreSignedUrlGeneratorFunction
+      - PreSignedUrlGeneratorAPI
     Properties:
       ApiId: !Ref PreSignedUrlGeneratorAPI
       IntegrationType: AWS_PROXY
